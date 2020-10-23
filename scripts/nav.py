@@ -131,7 +131,6 @@ def listener():
 	rate = rospy.Rate(10)
 	goalfb.publish(0)
 	while not rospy.is_shutdown():
-
 		try:
 			(lin,rot)=listener.lookupTransform('/odom','/camera_link',rospy.Time(0))
 			#positionCallback(lin,rot)
