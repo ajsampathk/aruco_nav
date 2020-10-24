@@ -19,7 +19,7 @@ class ImageListener:
         self.color_sub = message_filters.Subscriber(color_topic, msg_Image)
         self.sync = message_filters.TimeSynchronizer([self.depth_sub,self.color_sub],1)
         self.sync.registerCallback(self.imagesCallback)
-        self.VISUALIZE= False
+        self.VISUALIZE= True
         self.image_pub = rospy.Publisher('/mask/image',msg_Image,queue_size=1)
        
 
@@ -55,25 +55,53 @@ class ImageListener:
             if self.VISUALIZE:
                 
                 #center
-                cv_color_image[mid[1]-10:mid[1]+10,mid[0]+10]=0
-                cv_color_image[mid[1],mid[0]:mid[0]+10+10]=0
+                cv_color_image[mid[1]-20:mid[1]+20,mid[0]]=0
+                cv_color_image[mid[1],mid[0]-20:mid[0]+20]=0
 
                 #distance coloring
                 cv_color_image[row,col,0]=128
 
                 #left axis
-                cv_color_image[:,0:left_limit,2]=255
+                cv_color_image[:,0:left_limit,1]=150
                 cv_color_image[:,left_limit]=255
 
                 #right axis
-                cv_color_image[:,right_limit:,2]=255
+                cv_color_image[:,right_limit:,1]=150
                 cv_color_image[:,right_limit]=255
-                font=cv2.FONT_HERSHEY_SIMPLEX
-                fontScale = 0.75
-                color=(0,255,128)
-                thickness = 2
-                org = (mid[0]-50,50)
-                cv_color_image = cv2.putText(cv_color_image,"Obstacle:"+str(density>0.039),org,font,fontScale,color,thickness,cv2.LINE_AA)
+
+                #info box
+                cv_color_image[25:100,5]=255
+                cv_color_image[25:100,150]=255
+                cv_color_image[25,5:150]=255
+                cv_color_image[100,5:150]=255
+                
+                font=cv2.FONT_HERSHEY_TRIPLEX
+                fontScale = 0.35
+                thickness = 1
+
+#                title_org = (10,40)
+                density_org = (10,67)
+                fov_org =(10,45)
+                obs_org = (10,90)
+                center_org=(mid[0]+15,mid[1]+15)
+                color=(255,255,255)
+                center_color = (255,255,255)
+                if density>0.039:
+                    obs_color=(255,0,0)
+                else:
+                    obs_color=color
+                
+#                title_str = "RIA Obstacle Detection"
+                obs_str = "Obstacle: "+str(density>0.039) 
+                density_str = "Density: {:.2f}%".format(density*100.0)
+                center_str = "{:.2f}m".format(center_distance/1000.0)  
+                fov_str = "FOV: "+str(right_limit-left_limit)+"[{:.2f}%]".format(100*float(right_limit-left_limit)/float(color_image.width))  
+                
+                cv_color_image = cv2.putText(cv_color_image,obs_str,obs_org,font,fontScale,obs_color,thickness,cv2.LINE_AA)
+#                cv_color_image = cv2.putText(cv_color_image,title_str,title_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                cv_color_image = cv2.putText(cv_color_image,fov_str,fov_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                cv_color_image = cv2.putText(cv_color_image,density_str,density_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                cv_color_image = cv2.putText(cv_color_image,center_str,center_org,font,fontScale,center_color,thickness,cv2.LINE_AA)
             
 
                 try:
