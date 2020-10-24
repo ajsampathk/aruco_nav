@@ -2,6 +2,6 @@
 Navigation with Dynamixels and D435i
 
 
-###Obstacle Detection Visualized:
+### Obstacle Detection Visualized:
 
 ![](results/obstacle.gif)
