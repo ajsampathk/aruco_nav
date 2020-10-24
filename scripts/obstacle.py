@@ -41,7 +41,8 @@ class ImageListener:
                     right_limit=639
                 if left_limit<0:
                     left_limit=0
-            except OverflowError:
+            except OverflowError as e:
+                rospy.logwarn(e)
                 right_limit=color_image.width-1
                 left_limit = 0
 
@@ -70,39 +71,44 @@ class ImageListener:
                 cv_color_image[:,right_limit]=255
 
                 #info box
-                cv_color_image[25:100,5]=255
-                cv_color_image[25:100,150]=255
+                cv_color_image[25:130,5]=255
+                cv_color_image[25:130,150]=255
                 cv_color_image[25,5:150]=255
-                cv_color_image[100,5:150]=255
+                cv_color_image[130,5:150]=255
                 
                 font=cv2.FONT_HERSHEY_TRIPLEX
-                fontScale = 0.35
+                fontScale = 0.32
                 thickness = 1
 
-#                title_org = (10,40)
-                density_org = (10,67)
-                fov_org =(10,45)
-                obs_org = (10,90)
+                range_org = (10,45)
+                density_org = (10,105)
+                fov_org =(10,87)
+                r_width_org = (10,65)
+                obs_org = (10,125)
                 center_org=(mid[0]+15,mid[1]+15)
-                color=(255,255,255)
-                center_color = (255,255,255)
+
+                white=(255,255,255)
+                yellow=(255,255,0)
+                
+                color=white
                 if density>0.039:
                     obs_color=(255,0,0)
                 else:
-                    obs_color=color
+                    obs_color=(0,255,0)
                 
-#                title_str = "RIA Obstacle Detection"
+                range_str = "Threshold: {:.2f}m".format(threshold/1000.0)
+                r_width_str = "R_width: {:.2f}m".format(self.robot_width/1000.0)
                 obs_str = "Obstacle: "+str(density>0.039) 
                 density_str = "Density: {:.2f}%".format(density*100.0)
                 center_str = "{:.2f}m".format(center_distance/1000.0)  
-                fov_str = "FOV: "+str(right_limit-left_limit)+"[{:.2f}%]".format(100*float(right_limit-left_limit)/float(color_image.width))  
+                fov_str = "FOV: {} [{:.2f}%]".format((right_limit-left_limit),100*float(right_limit-left_limit)/float(color_image.width))  
                 
                 cv_color_image = cv2.putText(cv_color_image,obs_str,obs_org,font,fontScale,obs_color,thickness,cv2.LINE_AA)
-#                cv_color_image = cv2.putText(cv_color_image,title_str,title_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                cv_color_image = cv2.putText(cv_color_image,range_str,range_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
                 cv_color_image = cv2.putText(cv_color_image,fov_str,fov_org,font,fontScale,color,thickness,cv2.LINE_AA)
                 cv_color_image = cv2.putText(cv_color_image,density_str,density_org,font,fontScale,color,thickness,cv2.LINE_AA)
-                cv_color_image = cv2.putText(cv_color_image,center_str,center_org,font,fontScale,center_color,thickness,cv2.LINE_AA)
-            
+                cv_color_image = cv2.putText(cv_color_image,center_str,center_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                cv_color_image = cv2.putText(cv_color_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
 
                 try:
                     self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_color_image,"rgb8"))
