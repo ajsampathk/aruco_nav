@@ -2,7 +2,7 @@
 import rospy
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
-pub= rospy.Publisher("/dynamixel_workbench/cmd_vel",Twist,queue_size=1)
+pub= rospy.Publisher("/ria_nav_teleop/cmd_vel",Twist,queue_size=1)
 
 def joyCallback(msg):
     command= Twist()
@@ -10,6 +10,7 @@ def joyCallback(msg):
     command.angular.z= 0.3*msg.axes[1]
     command.linear.x= 0.005* axes[3]
     pub.publish(command)
+    rospy.loginfo("published")
 
 
 

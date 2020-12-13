@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import sys
 import os
-
+from std_msgs.msg import Bool
 class ImageListener:
 	
     def __init__(self, depth_topic,color_topic=None,robot_width=1200):
@@ -19,9 +19,11 @@ class ImageListener:
         self.color_sub = message_filters.Subscriber(color_topic, msg_Image)
         self.sync = message_filters.TimeSynchronizer([self.depth_sub,self.color_sub],1)
         self.sync.registerCallback(self.imagesCallback)
-        self.VISUALIZE= True
+        self.VISUALIZE= False
         self.image_pub = rospy.Publisher('/mask/image',msg_Image,queue_size=1)
-       
+        self.obstacle_pub = rospy.Publisher("/ria_nav/obstacle",Bool,queue_size=1)
+        rospy.loginfo("Initialized Listener")
+        rospy.loginfo("Visualization: {}".format(self.VISUALIZE))
 
     def imagesCallback(self,depth_image,color_image):
         try:
@@ -116,13 +118,17 @@ class ImageListener:
                 except CvBridgeError as e:
                     rospy.logerr(e)
 
-            rospy.loginfo("[DENSITY]:{} [Obstacle]:{} |Center:{}".format(density,density>0.039,center_distance))
+            print("[DENSITY]:{} [Obstacle]:{} |Center:{}".format(density,density>0.039,center_distance))
+            if density>0.039:
+              self.obstacle_pub.publish(True)
+            else:
+              self.obstacle_pub.publish(False)
         except CvBridgeError as e:
             print(e)
             return
 
 def main():
-    color_topic = '/camera/color/image_rect_color'
+    color_topic = '/camera/color/image_raw'
     depth_topic = '/camera/aligned_depth_to_color/image_raw'
     listener = ImageListener(depth_topic,color_topic)
     rospy.spin()
