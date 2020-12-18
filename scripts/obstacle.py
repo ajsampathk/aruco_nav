@@ -130,18 +130,28 @@ class ImageListener:
         frame = self.cv_color_image
         gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
         corners,ids,rejects = aruco.detectMarkers(gray,self.aruco_dict,parameters=self.aruco_params)
+        
         # rospy.loginfo(ids[0])
-        _distance = self.cv_depth_image[int(corners[0][0][0][0]),int(corners[0][0][0][1])]
-        if self.VISUALIZE:
-            font=cv2.FONT_HERSHEY_TRIPLEX
-            fontScale = 0.32
-            thickness = 1
-            yellow=(255,255,0)
+        
+        if corners:
+            
+            _b = corners[0][0][3][1]-corners[0][0][0][1]
+            _a = corners[0][0][2][1]-corners[0][0][1][1]
+            _h = int(((corners[0][0][1][0]-corners[0][0][0][0])+(corners[0][0][3][0]-corners[0][0][2][0]))/2.0)
 
-            if corners:
+            center_y = int((corners[0][0][3][1]-corners[0][0][0][1]) + corners[0][0][0][1])
+            delta_x = (((_b+2.0*_a)/(3.0*(_a+_b)))*_h)
+            center_x = int(delta_x+(corners[0][0][0][0]+corners[0][0][3][0])/2.0)
+            _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
+
+            if self.VISUALIZE:
+                font=cv2.FONT_HERSHEY_TRIPLEX
+                fontScale = 0.32
+                thickness = 1
+                yellow=(255,255,0)
                 aruco.drawDetectedMarkers(frame,corners)
-                frame = cv2.putText(frame,str(_distance),(int(corners[0][0][0][0]),int(corners[0][0][0][1])),font,fontScale,yellow,thickness,cv2.LINE_AA)
-                frame = cv2.putText(frame,str(ids[0]),(int(corners[0][0][3][0]),int(corners[0][0][3][1])),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
+                frame = cv2.putText(frame,str(_distance),(int(center_x),int(center_y)-5),font,fontScale,yellow,thickness,cv2.LINE_AA)
+                frame = cv2.putText(frame,str(ids[0]),(int(corners[0][0][3][0]),5+int(corners[0][0][3][1])),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
 
                 try:
                     self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame,"rgb8"))
