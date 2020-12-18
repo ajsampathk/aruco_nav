@@ -4,6 +4,7 @@ import message_filters
 from sensor_msgs.msg import Image as msg_Image
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
+import cv2.aruco as aruco 
 import numpy as np
 import sys
 import os
@@ -14,26 +15,27 @@ class ImageListener:
         self.depth_topic = depth_topic
         self.color_topic = color_topic
         self.robot_width = robot_width
+
+        self.aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
+        self.aruco_params = aruco.DetectorParameters_create()
+
+
+
         self.bridge = CvBridge()
         self.depth_sub = message_filters.Subscriber(depth_topic, msg_Image)
         self.color_sub = message_filters.Subscriber(color_topic, msg_Image)
         self.sync = message_filters.TimeSynchronizer([self.depth_sub,self.color_sub],1)
         self.sync.registerCallback(self.imagesCallback)
-        self.VISUALIZE= False
+        self.VISUALIZE= True
         self.image_pub = rospy.Publisher('/mask/image',msg_Image,queue_size=1)
         self.obstacle_pub = rospy.Publisher("/ria_nav/obstacle",Bool,queue_size=1)
         rospy.loginfo("Initialized Listener")
         rospy.loginfo("Visualization: {}".format(self.VISUALIZE))
 
-    def imagesCallback(self,depth_image,color_image):
-        try:
-            cv_color_image = self.bridge.imgmsg_to_cv2(color_image,color_image.encoding)
-            cv_depth_image = self.bridge.imgmsg_to_cv2(depth_image,depth_image.encoding)
+    def detectObstacle(self):
             threshold = 1000
-            mid = (color_image.width/2,color_image.height/2)
-
-            center_distance = cv_depth_image[mid[0],mid[1]]
-            row,col = np.where(cv_depth_image<threshold)
+            center_distance = self.cv_depth_image[self.mid[0],self.mid[1]]
+            row,col = np.where(self.cv_depth_image<threshold)
             points = np.vstack((row,col)).T
 
             try:
@@ -45,38 +47,38 @@ class ImageListener:
                     left_limit=0
             except OverflowError as e:
                 rospy.logwarn(e)
-                right_limit=color_image.width-1
+                right_limit=self.image_width-1
                 left_limit = 0
 
             left = points>=(0,left_limit)
-            right = points<=(color_image.height,right_limit)
+            right = points<=(self.image_height,right_limit)
             total_points = np.logical_and(left,right)
             population = total_points.sum()-len(total_points)
-            density = float(population)/float(color_image.height*(right_limit-left_limit))
+            density = float(population)/float(self.image_height*(right_limit-left_limit))
 
 
             if self.VISUALIZE:
                 
                 #center
-                cv_color_image[mid[1]-20:mid[1]+20,mid[0]]=0
-                cv_color_image[mid[1],mid[0]-20:mid[0]+20]=0
+                self.self.cv_color_image[mid[1]-20:mid[1]+20,mid[0]]=0
+                self.cv_color_image[mid[1],mid[0]-20:mid[0]+20]=0
 
                 #distance coloring
-                cv_color_image[row,col,0]=128
+                self.cv_color_image[row,col,0]=128
 
                 #left axis
-                cv_color_image[:,0:left_limit,1]=150
-                cv_color_image[:,left_limit]=255
+                self.cv_color_image[:,0:left_limit,1]=150
+                self.cv_color_image[:,left_limit]=255
 
                 #right axis
-                cv_color_image[:,right_limit:,1]=150
-                cv_color_image[:,right_limit]=255
+                self.cv_color_image[:,right_limit:,1]=150
+                self.cv_color_image[:,right_limit]=255
 
                 #info box
-                cv_color_image[25:130,5]=255
-                cv_color_image[25:130,150]=255
-                cv_color_image[25,5:150]=255
-                cv_color_image[130,5:150]=255
+                self.cv_color_image[25:130,5]=255
+                self.cv_color_image[25:130,150]=255
+                self.cv_color_image[25,5:150]=255
+                self.cv_color_image[130,5:150]=255
                 
                 font=cv2.FONT_HERSHEY_TRIPLEX
                 fontScale = 0.32
@@ -105,15 +107,15 @@ class ImageListener:
                 center_str = "{:.2f}m".format(center_distance/1000.0)  
                 fov_str = "FOV: {} [{:.2f}%]".format((right_limit-left_limit),100*float(right_limit-left_limit)/float(color_image.width))  
                 
-                cv_color_image = cv2.putText(cv_color_image,obs_str,obs_org,font,fontScale,obs_color,thickness,cv2.LINE_AA)
-                cv_color_image = cv2.putText(cv_color_image,range_str,range_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
-                cv_color_image = cv2.putText(cv_color_image,fov_str,fov_org,font,fontScale,color,thickness,cv2.LINE_AA)
-                cv_color_image = cv2.putText(cv_color_image,density_str,density_org,font,fontScale,color,thickness,cv2.LINE_AA)
-                cv_color_image = cv2.putText(cv_color_image,center_str,center_org,font,fontScale,color,thickness,cv2.LINE_AA)
-                cv_color_image = cv2.putText(cv_color_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
+                self.cv_color_image = cv2.putText(self.cv_color_image,obs_str,obs_org,font,fontScale,obs_color,thickness,cv2.LINE_AA)
+                self.cv_color_image = cv2.putText(self.cv_color_image,range_str,range_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
+                self.cv_color_image = cv2.putText(self.cv_color_image,fov_str,fov_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                self.cv_color_image = cv2.putText(self.cv_color_image,density_str,density_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                self.cv_color_image = cv2.putText(self.cv_color_image,center_str,center_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                self.cv_color_image = cv2.putText(self.cv_color_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
 
                 try:
-                    self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_color_image,"rgb8"))
+                    self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.cv_color_image,"rgb8"))
 
                 except CvBridgeError as e:
                     rospy.logerr(e)
@@ -123,6 +125,45 @@ class ImageListener:
               self.obstacle_pub.publish(True)
             else:
               self.obstacle_pub.publish(False)
+
+    def detectMarker(self):
+        frame = self.cv_color_image
+        gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        corners,ids,rejects = aruco.detectMarkers(gray,self.aruco_dict,parameters=self.aruco_params)
+        # rospy.loginfo(ids[0])
+        _distance = self.cv_depth_image[int(corners[0][0][0][0]),int(corners[0][0][0][1])]
+        if self.VISUALIZE:
+            font=cv2.FONT_HERSHEY_TRIPLEX
+            fontScale = 0.32
+            thickness = 1
+            yellow=(255,255,0)
+
+            if corners:
+                aruco.drawDetectedMarkers(frame,corners)
+                frame = cv2.putText(frame,str(_distance),(int(corners[0][0][0][0]),int(corners[0][0][0][1])),font,fontScale,yellow,thickness,cv2.LINE_AA)
+                frame = cv2.putText(frame,str(ids[0]),(int(corners[0][0][3][0]),int(corners[0][0][3][1])),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
+
+                try:
+                    self.image_pub.publish(self.bridge.cv2_to_imgmsg(frame,"rgb8"))
+                    rospy.loginfo("Marker Image Published")
+                except CvBridgeError as e:
+                    rospy.logerr(e)
+            else:
+                rospy.loginfo("Markers not found")
+
+
+
+
+    def imagesCallback(self,depth_image,color_image):
+        try:
+            self.cv_color_image = self.bridge.imgmsg_to_cv2(color_image,color_image.encoding)
+            self.cv_depth_image = self.bridge.imgmsg_to_cv2(depth_image,depth_image.encoding)
+            self.mid = (color_image.width/2,color_image.height/2)
+            self.image_width = color_image.width
+            self.image_height = color_image.height
+            #self.detectObstacle()
+            self.detectMarker()
+            
         except CvBridgeError as e:
             print(e)
             return
