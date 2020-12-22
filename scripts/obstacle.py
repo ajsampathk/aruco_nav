@@ -43,6 +43,8 @@ class ImageListener:
         self.cv_color_image=None
         self.cv_depth_image=None
 
+        self.new_image=False
+
     def startObstacleDetection(self):
         if self.startedObstacleDetection:
             rospy.logwarn("Multiple attempts to strat thread for obstacle detection. Ignoring...")
@@ -164,45 +166,47 @@ class ImageListener:
     def detectMarker(self):
 
         while self.startedMarkerDetection:
-            frame = self.cv_color_image
-            try:
-                gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-                corners,ids,rejects = aruco.detectMarkers(gray,self.aruco_dict,parameters=self.aruco_params)
-            except:
-                rospy.logwarn("Error Reading Image, Is the topic being published?")
-                continue
-          
-            if corners:
-                rospy.loginfo("Found Marker(s):"+str(ids.tolist()))               
-                _b = corners[0][0][3][1]-corners[0][0][0][1]
-                _a = corners[0][0][2][1]-corners[0][0][1][1]
-                _h = float(((corners[0][0][1][0]-corners[0][0][0][0])+(corners[0][0][2][0]-corners[0][0][3][0]))/2.0)
-
-                center_y = int((corners[0][0][3][1]-corners[0][0][0][1]) + corners[0][0][0][1])
-                delta_x = (((_b+2.0*_a)/(3.0*(_a+_b)))*_h)
-                center_x = int(delta_x+(corners[0][0][0][0]+corners[0][0][3][0])/2.0)
-                
+            if self.new_image:
+                frame = self.cv_color_image
                 try:
-                    _theta = math.acos(float(_h)/float(_b))
-                    _theta = math.degrees(_theta)
-                    rospy.loginfo("B:{},H:{},Theta:{}deg".format(_b,_h,_theta))
-                except ValueError:
-                    rospy.logwarn("Error Calculating theta")
-                _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
+                    gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+                    corners,ids,rejects = aruco.detectMarkers(gray,self.aruco_dict,parameters=self.aruco_params)
+                except:
+                    rospy.logwarn("Error Reading Image, Is the topic being published?")
+                    continue
+            
+                if corners:
+                    rospy.loginfo("Found Marker(s):"+str(ids.tolist()))               
+                    _b = corners[0][0][3][1]-corners[0][0][0][1]
+                    _a = corners[0][0][2][1]-corners[0][0][1][1]
+                    _h = float(((corners[0][0][1][0]-corners[0][0][0][0])+(corners[0][0][2][0]-corners[0][0][3][0]))/2.0)
 
-                if self.VISUALIZE:
-                    font=cv2.FONT_HERSHEY_TRIPLEX
-                    fontScale = 0.32
-                    thickness = 1
-                    yellow=(255,255,0)
-                    aruco.drawDetectedMarkers(frame,corners)
-                    frame = cv2.putText(frame,str(_distance),(int(center_x),int(center_y)-5),font,fontScale,yellow,thickness,cv2.LINE_AA)
-                    frame = cv2.putText(frame,"{:.2f}deg".format(_theta),(int(center_x),int(center_y)-20),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
-                    frame = cv2.putText(frame,str(ids[0]),(int(corners[0][0][3][0]),5+int(corners[0][0][3][1])),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
-                    self.mask_image = frame
-                    self.publish_image()
-            else:
-                rospy.loginfo("Markers not found")
+                    center_y = int((corners[0][0][3][1]-corners[0][0][0][1]) + corners[0][0][0][1])
+                    delta_x = (((_b+2.0*_a)/(3.0*(_a+_b)))*_h)
+                    center_x = int(delta_x+(corners[0][0][0][0]+corners[0][0][3][0])/2.0)
+                    
+                    try:
+                        _theta = math.acos(float(_h)/float(_b))
+                        _theta = math.degrees(_theta)
+                        rospy.loginfo("B:{},H:{},Theta:{}deg".format(_b,_h,_theta))
+                    except ValueError:
+                        rospy.logwarn("Error Calculating theta")
+                    _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
+
+                    if self.VISUALIZE:
+                        font=cv2.FONT_HERSHEY_TRIPLEX
+                        fontScale = 0.32
+                        thickness = 1
+                        yellow=(255,255,0)
+                        aruco.drawDetectedMarkers(frame,corners)
+                        frame = cv2.putText(frame,str(_distance),(int(center_x),int(center_y)-5),font,fontScale,yellow,thickness,cv2.LINE_AA)
+                        frame = cv2.putText(frame,"{:.2f}deg".format(_theta),(int(center_x),int(center_y)-20),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
+                        frame = cv2.putText(frame,str(ids[0]),(int(corners[0][0][3][0]),5+int(corners[0][0][3][1])),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
+                        self.mask_image = frame
+                        self.publish_image()
+                else:
+                    rospy.loginfo("Markers not found")
+                self.new_image=False
 
 
     def publish_image(self):
@@ -222,6 +226,7 @@ class ImageListener:
             self.image_width = color_image.width
             self.image_height = color_image.height
             rospy.loginfo("Image Recieved")
+            self.new_image = True
             #self.detectObstacle()
             #self.detectMarker()
             
