@@ -184,7 +184,7 @@ class ImageListener:
                     center_y = int((corners[0][0][3][1]-corners[0][0][0][1]) + corners[0][0][0][1])
                     delta_x = (((_b+2.0*_a)/(3.0*(_a+_b)))*_h)
                     center_x = int(delta_x+(corners[0][0][0][0]+corners[0][0][3][0])/2.0)
-                    
+                    _theta = 0.0
                     try:
                         _theta = math.acos(float(_h)/float(_b))
                         _theta = math.degrees(_theta)
