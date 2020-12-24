@@ -9,7 +9,6 @@ import numpy as np
 import sys
 import os
 from std_msgs.msg import Bool
-from threading import Thread
 import math
 
 
@@ -50,8 +49,6 @@ class ImageListener:
             rospy.logwarn("Multiple attempts to strat thread for obstacle detection. Ignoring...")
             return False
         self.startedObstacleDetection = True
-        self.ObstacleThread = Thread(target=self.detectObstacle,args=())
-        self.ObstacleThread.start()
         rospy.loginfo("Obstacle Detection started")
         return True
 
@@ -60,8 +57,6 @@ class ImageListener:
             rospy.logwarn("Multiple attempts to strat thread for marker detection. Ignoring...")
             return False
         self.startedMarkerDetection = True
-        self.MarkerThread = Thread(target=self.detectMarker,args=())
-        self.MarkerThread.start()
         rospy.loginfo("Marker Detection started")
         return True
 
@@ -69,15 +64,12 @@ class ImageListener:
     def stopAll(self):
         self.startedObstacleDetection=False
         self.startedMarkerDetection=False
-        self.MarkerThread.join()
-        self.ObstacleThread.join()
 
 
 
     def detectObstacle(self):
         while self.startedObstacleDetection:
-                center_distance = self.cv_d
-                self.image_height = color_image.heightpth_image[self.mid[0],self.mid[1]]
+                center_distance = self.cv_depth_image[self.mid[0],self.mid[1]]
                 row,col = np.where(self.cv_depth_image<self.threshold)
                 points = np.vstack((row,col)).T
 
@@ -165,7 +157,7 @@ class ImageListener:
 
     def detectMarker(self):
 
-        while self.startedMarkerDetection:
+        if self.startedMarkerDetection:
             if self.new_image:
                 frame = self.cv_color_image
                 try:
@@ -199,7 +191,7 @@ class ImageListener:
                         thickness = 1
                         yellow=(255,255,0)
                         aruco.drawDetectedMarkers(frame,corners)
-                        frame = cv2.putText(frame,str(_distance),(int(center_x),int(center_y)-5),font,fontScale,yellow,thickness,cv2.LINE_AA)
+                        frame = cv2.putText(frame,str(_distance),(int(center_whilex),int(center_y)-5),font,fontScale,yellow,thickness,cv2.LINE_AA)
                         frame = cv2.putText(frame,"{:.2f}deg".format(_theta),(int(center_x),int(center_y)-20),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
                         frame = cv2.putText(frame,str(ids[0]),(int(corners[0][0][3][0]),5+int(corners[0][0][3][1])),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
                         self.mask_image = frame
@@ -240,7 +232,12 @@ def main():
     listener = ImageListener(depth_topic,color_topic)
     listener.startMarkerDetection()
     try:
-        rospy.spin()
+        while not rospy.is_shutdown():
+            if listener.new_image:
+                listener.detectMarker()
+                listener.publish_image()
+                
+
     except KeyboardInterrupt:
         listener.stopAll()
         rospy.loginfo("Stopping Node")
