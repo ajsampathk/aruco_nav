@@ -68,7 +68,7 @@ class ImageListener:
 
 
     def detectObstacle(self):
-        while self.startedObstacleDetection:
+        if self.startedObstacleDetection:
                 center_distance = self.cv_depth_image[self.mid[0],self.mid[1]]
                 row,col = np.where(self.cv_depth_image<self.threshold)
                 points = np.vstack((row,col)).T
@@ -95,25 +95,25 @@ class ImageListener:
                 if self.VISUALIZE:
                     
                     #center
-                    self.self.cv_color_image[mid[1]-20:mid[1]+20,mid[0]]=0
-                    self.cv_color_image[mid[1],mid[0]-20:mid[0]+20]=0
+                    self.mask_image[self.mid[1]-20:self.mid[1]+20,self.mid[0]]=0
+                    self.mask_image[self.mid[1],self.mid[0]-20:self.mid[0]+20]=0
 
                     #distance coloring
-                    self.cv_color_image[row,col,0]=128
+                    self.mask_image[row,col,0]=128
 
                     #left axis
-                    self.cv_color_image[:,0:left_limit,1]=150
-                    self.cv_color_image[:,left_limit]=255
+                    self.mask_image[:,0:left_limit,1]=150
+                    self.mask_image[:,left_limit]=255
 
                     #right axis
-                    self.cv_color_image[:,right_limit:,1]=150
-                    self.cv_color_image[:,right_limit]=255
+                    self.mask_image[:,right_limit:,1]=150
+                    self.mask_image[:,right_limit]=255
 
                     #info box
-                    self.cv_color_image[25:130,5]=255
-                    self.cv_color_image[25:130,150]=255
-                    self.cv_color_image[25,5:150]=255
-                    self.cv_color_image[130,5:150]=255
+                    self.mask_image[25:130,5]=255
+                    self.mask_image[25:130,150]=255
+                    self.mask_image[25,5:150]=255
+                    self.mask_image[130,5:150]=255
                     
                     font=cv2.FONT_HERSHEY_TRIPLEX
                     fontScale = 0.32
@@ -122,9 +122,9 @@ class ImageListener:
                     range_org = (10,45)
                     density_org = (10,105)
                     fov_org =(10,87)
-                    r_widtorg = (10,65)
+                    r_width_org = (10,65)
                     obs_org = (10,125)
-                    center_org=(mid[0]+15,mid[1]+15)
+                    center_org=(self.mid[0]+15,self.mid[1]+15)
 
                     white=(255,255,255)
                     yellow=(255,255,0)
@@ -140,12 +140,12 @@ class ImageListener:
                     obs_str = "Obstacle: "+str(density>0.039) 
                     density_str = "Density: {:.2f}%".format(density*100.0)
                     center_str = "{:.2f}m".format(center_distance/1000.0)  
-                    fov_str = "FOV: {} [{:.2f}%]".format((right_limit-left_limit),100*float(right_limit-left_limit)/float(color_image.width))  
+                    fov_str = "FOV: {} [{:.2f}%]".format((right_limit-left_limit),100*float(right_limit-left_limit)/float(self.image_width))  
                     
-                    self.mask_image = cv2.putText(self.cv_color_image,obs_str,obs_org,font,fontScale,obs_color,thickness,cv2.LINE_AA)
-                    self.mask_image = cv2.putText(self.cv_color_image,range_str,range_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
-                    self.mask_image = cv2.putText(self.cv_color_image,center_str,center_org,font,fontScale,color,thickness,cv2.LINE_AA)
-                    self.mask_image = cv2.putText(self.cv_color_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
+                    self.mask_image = cv2.putText(self.mask_image,obs_str,obs_org,font,fontScale,obs_color,thickness,cv2.LINE_AA)
+                    self.mask_image = cv2.putText(self.mask_image,range_str,range_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
+                    self.mask_image = cv2.putText(self.mask_image,center_str,center_org,font,fontScale,color,thickness,cv2.LINE_AA)
+                    self.mask_image = cv2.putText(self.mask_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
 
 
                 print("[DENSITY]:{} [Obstacle]:{} |Center:{}".format(density,density>0.039,center_distance))
@@ -165,7 +165,7 @@ class ImageListener:
                     corners,ids,rejects = aruco.detectMarkers(gray,self.aruco_dict,parameters=self.aruco_params)
                 except:
                     rospy.logwarn("Error Reading Image, Is the topic being published?")
-                    continue
+                    return None
             
                 if corners:
                     rospy.loginfo("Found Marker(s):"+str(ids.tolist()))               
@@ -173,7 +173,7 @@ class ImageListener:
                     _a = corners[0][0][2][1]-corners[0][0][1][1]
                     _h = float(((corners[0][0][1][0]-corners[0][0][0][0])+(corners[0][0][2][0]-corners[0][0][3][0]))/2.0)
 
-                    center_y = int((corners[0][0][3][1]-corners[0][0][0][1]) + corners[0][0][0][1])
+                    center_y = int((corners[0][0][3][1]-corners[0][0][0][1])/2 + corners[0][0][0][1])
                     delta_x = (((_b+2.0*_a)/(3.0*(_a+_b)))*_h)
                     center_x = int(delta_x+(corners[0][0][0][0]+corners[0][0][3][0])/2.0)
                     _theta = 0.0
@@ -182,7 +182,7 @@ class ImageListener:
                         _theta = math.degrees(_theta)
                         rospy.loginfo("B:{},H:{},Theta:{}deg".format(_b,_h,_theta))
                     except ValueError:
-                        rospy.logwarn("Error Calculating theta")
+                        rospy.logwarn("Error Calculating theta with values {},{}".format(_h,_b))
                     _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
 
                     if self.VISUALIZE:
@@ -191,13 +191,14 @@ class ImageListener:
                         thickness = 1
                         yellow=(255,255,0)
                         aruco.drawDetectedMarkers(frame,corners)
-                        frame = cv2.putText(frame,str(_distance),(int(center_whilex),int(center_y)-5),font,fontScale,yellow,thickness,cv2.LINE_AA)
+                        frame = cv2.putText(frame,str(_distance),(int(center_x),int(center_y)-5),font,fontScale,yellow,thickness,cv2.LINE_AA)
                         frame = cv2.putText(frame,"{:.2f}deg".format(_theta),(int(center_x),int(center_y)-20),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
                         frame = cv2.putText(frame,str(ids[0]),(int(corners[0][0][3][0]),5+int(corners[0][0][3][1])),font,fontScale,(255,255,255),thickness,cv2.LINE_AA)
                         self.mask_image = frame
-                        self.publish_image()
+                        
                 else:
                     rospy.loginfo("Markers not found")
+                    self.mask_image = frame
                 self.new_image=False
 
 
@@ -205,6 +206,8 @@ class ImageListener:
         try:
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.mask_image,"rgb8"))
             rospy.loginfo("Visualization Image published")
+        except TypeError as e:
+            rospy.logwarn("No Inference Image to publish")
         except CvBridgeError as e:
             rospy.logerr(e)
 
@@ -231,12 +234,18 @@ def main():
     depth_topic = '/camera/aligned_depth_to_color/image_raw'
     listener = ImageListener(depth_topic,color_topic)
     listener.startMarkerDetection()
+    listener.startObstacleDetection()
+    rate = rospy.Rate(25)
     try:
         while not rospy.is_shutdown():
             if listener.new_image:
                 listener.detectMarker()
+                listener.detectObstacle()
                 listener.publish_image()
-                
+            else:
+                rospy.loginfo("Waiting for synchronized depth image..")
+            rate.sleep()
+            
 
     except KeyboardInterrupt:
         listener.stopAll()
