@@ -1,26 +1,55 @@
+#!/usr/bin/env python
 import rospy
-# from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist
+from std_srvs.srv import TriggerResponse, Trigger
 from dynamixel_workbench_msgs.msg import DynamixelStateList
-i_right,i_left = 0,0
+
+i_values = {}
+right_l, left_l, right_r, left_r  = 0,0,0,0
+linear,rotational = 0,0
 first = True
 
+local_odom_pub = rospy.Publisher('/ria/odom/local', Twist, queue_size=1)
+
+def reset_initial(msg):
+    global first
+    response = TriggerResponse()
+    first = True
+    response.success = True
+    rospy.loginfo("Initial value reseted")
+    return response
+
 def odom(msg):
-    global i_right, i_left, first
+    global i_values, right_l, left_l,right_r, left_r, first, linear, rotational
     wheels = {}
     for i in msg.dynamixel_state:
         wheels[i.name] = i.present_position
     if first:
-        i_right,i_left = (wheels["Right_Rear"]+wheels["Right_Front"])/2,(wheels["Left_Rear"]+wheels["Left_Front"])/2 
+        i_values = wheels
+        first = False 
     else:
-        right,left = (wheels["Right_Rear"]+wheels["Right_Front"])/2 - i_right ,(wheels["Left_Rear"]+wheels["Left_Front"])/2 - i_left
-    linear = ((abs(right)+ abs(left))/2)*right/abs(right)
-    rotational = (abs(right)+ abs(left))/15
-    rospy.loginfo("")
+        right_l = 0.314*((((wheels["Right_Rear"] - i_values["Right_Rear"]) + (-1*((wheels["Right_Front"] - i_values["Right_Front"]))))/2.0)/4096)
+        left_l = 0.314*((((wheels["Left_Rear"] - i_values["Left_Rear"]) + (-1*(wheels["Left_Front"] - i_values["Left_Front"])))/2.0)/4096)
+    linear = ((right_l + left_l)/2)
+    right_r = (((wheels["Right_Rear"] - i_values["Right_Rear"]) + (wheels["Right_Front"] - i_values["Right_Front"]))/2.0)/4095 
+    left_r = (((wheels["Left_Rear"] - i_values["Left_Rear"]) + (wheels["Left_Front"] - i_values["Left_Front"]))/2.0)/4095
+    rotational = (((right_r+left_r)/2)*0.314)/0.075
+    rospy.loginfo("Linear: "+str(linear)+" Rotatinal: "+str(rotational))
+   # rospy.loginfo("R: "+str(right)+" L: "+str(left)) #rotational)
+   # rospy.loginfo(wheels)
 
 def listener():
+    global linear, rotational
     rospy.init_node('ria_odom',anonymous=True) 
     rospy.Subscriber('/dynamixel_workbench/dynamixel_state',DynamixelStateList,odom)
-    rospy.spin()
+    i_reset = rospy.Service('/ria/odom/reset', Trigger, reset_initial)
+    rate= rospy.Rate(50)
+    while not rospy.is_shutdown():
+        pose = Twist()
+        pose.linear.x = linear
+        pose.angular.z = rotational
+        local_odom_pub.publish(pose)
+        rate.sleep()
 
 if __name__=='__main__':
     listener()
