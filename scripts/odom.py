@@ -3,6 +3,8 @@ import rospy
 from geometry_msgs.msg import Twist
 from std_srvs.srv import TriggerResponse, Trigger
 from dynamixel_workbench_msgs.msg import DynamixelStateList
+from math import pi 
+_pi = pi*0.1
 
 i_values = {}
 right_l, left_l, right_r, left_r  = 0,0,0,0
@@ -28,12 +30,12 @@ def odom(msg):
         i_values = wheels
         first = False 
     else:
-        right_l = 0.314*((((wheels["Right_Rear"] - i_values["Right_Rear"]) + (-1*((wheels["Right_Front"] - i_values["Right_Front"]))))/2.0)/4096)
-        left_l = 0.314*((((wheels["Left_Rear"] - i_values["Left_Rear"]) + (-1*(wheels["Left_Front"] - i_values["Left_Front"])))/2.0)/4096)
+        right_l = _pi*((((wheels["Right_Rear"] - i_values["Right_Rear"]) + (-1*((wheels["Right_Front"] - i_values["Right_Front"]))))/2.0)/4096)
+        left_l = _pi*((((wheels["Left_Rear"] - i_values["Left_Rear"]) + (-1*(wheels["Left_Front"] - i_values["Left_Front"])))/2.0)/4096)
     linear = ((right_l + left_l)/2)
     right_r = (((wheels["Right_Rear"] - i_values["Right_Rear"]) + (wheels["Right_Front"] - i_values["Right_Front"]))/2.0)/4095 
     left_r = (((wheels["Left_Rear"] - i_values["Left_Rear"]) + (wheels["Left_Front"] - i_values["Left_Front"]))/2.0)/4095
-    rotational = (((right_r+left_r)/2)*0.314)/0.075
+    rotational = (((right_r+left_r)/2)*_pi)/0.1
     rospy.loginfo("Linear: "+str(linear)+" Rotatinal: "+str(rotational))
    # rospy.loginfo("R: "+str(right)+" L: "+str(left)) #rotational)
    # rospy.loginfo(wheels)

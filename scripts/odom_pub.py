@@ -21,7 +21,7 @@ def poseCallback(msg):
    lin = Twist()
    if rotate:
        th_diff=goal[1]-msg.angular.z
-       if abs(th_diff)<0.025:
+       if abs(th_diff)<0.015:
          pub.publish(zero)
          rotate=False
        else:
@@ -33,14 +33,14 @@ def poseCallback(msg):
        #rospy.loginfo("Theta Diff:{}".format(th_diff))
    else:
         l_diff = goal[0]-msg.linear.x
-        if abs(l_diff)<0.05:
+        if abs(l_diff)<0.025:
             pub.publish(zero)
             rotate=True
         else:
            if l_diff<0:
-               lin.angular.z=-0.3
+               lin.angular.z=-0.2
            else:
-               lin.angular.z=0.3
+               lin.angular.z=0.2
            pub.publish(lin)
         #rospy.loginfo("Linear diff: {}".format(l_diff))
 def listener():
