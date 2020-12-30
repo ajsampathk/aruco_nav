@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find realsense2_camera)/launch/rs_rgbd.launch" />
+  <node name = "detector" pkg="robot_nav" type="obstacle.py" required="true" output="screen" />
+
+</launch>

@@ -148,7 +148,7 @@ class ImageListener:
                     self.mask_image = cv2.putText(self.mask_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
 
 
-                print("[DENSITY]:{} [Obstacle]:{} |Center:{}".format(density,density>0.039,center_distance))
+                rospy.loginfo("[DENSITY]:{} [Obstacle]:{} |Center:{}".format(density,density>0.039,center_distance))
                 if density>0.039:
                     self.obstacle_pub.publish(True)
                 else:
@@ -160,6 +160,7 @@ class ImageListener:
         if self.startedMarkerDetection:
             if self.new_image:
                 frame = self.cv_color_image
+                _distance=0.0
                 try:
                     gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
                     corners,ids,rejects = aruco.detectMarkers(gray,self.aruco_dict,parameters=self.aruco_params)
@@ -176,14 +177,21 @@ class ImageListener:
                     center_y = int((corners[0][0][3][1]-corners[0][0][0][1])/2 + corners[0][0][0][1])
                     delta_x = (((_b+2.0*_a)/(3.0*(_a+_b)))*_h)
                     center_x = int(delta_x+(corners[0][0][0][0]+corners[0][0][3][0])/2.0)
-                    _theta = 0.0
+                    if _b > _a:
+                    	_theta = 1.0
+                    else:
+                        _theta = -1.0
                     try:
-                        _theta = math.acos(float(_h)/float(_b))
+                        _theta = _theta*math.acos(float(_h)/float(_b))
                         _theta = math.degrees(_theta)
                         rospy.loginfo("B:{},H:{},Theta:{}deg".format(_b,_h,_theta))
+                        _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
                     except ValueError:
                         rospy.logwarn("Error Calculating theta with values {},{}".format(_h,_b))
-                    _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
+                    except ZeroDivisionError:
+                        rospy.logwarn("Zero Divison Error")
+                    except IndexError:
+                        rospy.logwarn("Index Out of Bounds")
 
                     if self.VISUALIZE:
                         font=cv2.FONT_HERSHEY_TRIPLEX
@@ -205,7 +213,7 @@ class ImageListener:
     def publish_image(self):
         try:
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.mask_image,"rgb8"))
-            rospy.loginfo("Visualization Image published")
+            #rospy.loginfo("Visualization Image published")
         except TypeError as e:
             rospy.logwarn("No Inference Image to publish")
         except CvBridgeError as e:
@@ -220,7 +228,7 @@ class ImageListener:
             self.mid = (color_image.width/2,color_image.height/2)
             self.image_width = color_image.width
             self.image_height = color_image.height
-            rospy.loginfo("Image Recieved")
+#            rospy.loginfo("Image Recieved")
             self.new_image = True
             #self.detectObstacle()
             #self.detectMarker()
@@ -235,7 +243,7 @@ def main():
     listener = ImageListener(depth_topic,color_topic)
     listener.startMarkerDetection()
     listener.startObstacleDetection()
-    rate = rospy.Rate(25)
+    rate = rospy.Rate(10)
     try:
         while not rospy.is_shutdown():
             if listener.new_image:
@@ -243,7 +251,7 @@ def main():
                 listener.detectObstacle()
                 listener.publish_image()
             else:
-                rospy.loginfo("Waiting for synchronized depth image..")
+                rospy.loginfo("------")
             rate.sleep()
             
 
