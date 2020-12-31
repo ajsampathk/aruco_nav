@@ -9,6 +9,7 @@ import numpy as np
 import sys
 import os
 from std_msgs.msg import Bool
+from robot_nav.msg import Marker
 import math
 
 
@@ -29,13 +30,17 @@ class ImageListener:
         self.color_sub = message_filters.Subscriber(color_topic, msg_Image)
         self.sync = message_filters.TimeSynchronizer([self.depth_sub,self.color_sub],1)
         self.sync.registerCallback(self.imagesCallback)
-        self.VISUALIZE= True
+        self.VISUALIZE= False
+        self.log_info = False
         self.image_pub = rospy.Publisher('/mask/image',msg_Image,queue_size=1)
-        self.obstacle_pub = rospy.Publisher("/ria_nav/obstacle",Bool,queue_size=1)
+        self.obstacle_pub = rospy.Publisher('/ria/odom/obstacle',Bool,queue_size=1)
+        self.marker_pub = rospy.Publisher('/ria/odom/marker', Marker, queue_size=1)
         rospy.loginfo("Initialized Listener")
         rospy.loginfo("Visualization: {}".format(self.VISUALIZE))
+        rospy.loginfo("Info Logging: {}".format(self.log_info))
         self.mask_image = None
-
+        self.marker_msg = Marker()
+        self.marker_found = False
         self.startedObstacleDetection = False
         self.startedMarkerDetection = False
 
@@ -148,7 +153,8 @@ class ImageListener:
                     self.mask_image = cv2.putText(self.mask_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
 
 
-                rospy.loginfo("[DENSITY]:{} [Obstacle]:{} |Center:{}".format(density,density>0.039,center_distance))
+                if self.log_info:
+                    rospy.loginfo("[DENSITY]:{} [Obstacle]:{} |Center:{}".format(density,density>0.039,center_distance))
                 if density>0.039:
                     self.obstacle_pub.publish(True)
                 else:
@@ -160,6 +166,7 @@ class ImageListener:
         if self.startedMarkerDetection:
             if self.new_image:
                 frame = self.cv_color_image
+                frame_center_x = self.mid[0]
                 _distance=0.0
                 try:
                     gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
@@ -169,7 +176,9 @@ class ImageListener:
                     return None
             
                 if corners:
-                    rospy.loginfo("Found Marker(s):"+str(ids.tolist()))               
+                    self.marker_found = True
+                    if self.log_info:
+                        rospy.loginfo("Found Marker(s):"+str(ids.tolist()))               
                     _b = corners[0][0][3][1]-corners[0][0][0][1]
                     _a = corners[0][0][2][1]-corners[0][0][1][1]
                     _h = float(((corners[0][0][1][0]-corners[0][0][0][0])+(corners[0][0][2][0]-corners[0][0][3][0]))/2.0)
@@ -178,20 +187,25 @@ class ImageListener:
                     delta_x = (((_b+2.0*_a)/(3.0*(_a+_b)))*_h)
                     center_x = int(delta_x+(corners[0][0][0][0]+corners[0][0][3][0])/2.0)
                     if _b > _a:
-                    	_theta = 1.0
+                    	_theta = -1.0
                     else:
-                        _theta = -1.0
+                        _theta = 1.0
                     try:
                         _theta = _theta*math.acos(float(_h)/float(_b))
                         _theta = math.degrees(_theta)
-                        rospy.loginfo("B:{},H:{},Theta:{}deg".format(_b,_h,_theta))
+                        if self.log_info:
+                            rospy.loginfo("B:{},H:{},Theta:{}deg".format(_b,_h,_theta))
                         _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
+                        self.marker_msg.id = ids[0][0]
+                        self.marker_msg.distance = _distance
+                        self.marker_msg.theta = _theta
+                        self.marker_msg.aligned = (abs(center_x-frame_center_x)<abs(_h))
                     except ValueError:
                         rospy.logwarn("Error Calculating theta with values {},{}".format(_h,_b))
                     except ZeroDivisionError:
                         rospy.logwarn("Zero Divison Error")
-                    except IndexError:
-                        rospy.logwarn("Index Out of Bounds")
+                    except IndexError as e:
+                        rospy.logwarn("Index Out of Bounds: {}".format(e))
 
                     if self.VISUALIZE:
                         font=cv2.FONT_HERSHEY_TRIPLEX
@@ -205,20 +219,27 @@ class ImageListener:
                         self.mask_image = frame
                         
                 else:
-                    rospy.loginfo("Markers not found")
+                    rospy.logwarn("Markers not found")
                     self.mask_image = frame
+                    self.marker_found = False
                 self.new_image=False
 
 
     def publish_image(self):
         try:
-            self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.mask_image,"rgb8"))
+            if self.VISUALIZE:
+                self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.mask_image,"rgb8"))
             #rospy.loginfo("Visualization Image published")
         except TypeError as e:
             rospy.logwarn("No Inference Image to publish")
         except CvBridgeError as e:
             rospy.logerr(e)
-
+   
+    def publish_marker(self):
+        if self.marker_found:
+            self.marker_pub.publish(self.marker_msg)
+            if self.log_info:
+                rospy.loginfo(marker_msg)
 
 
     def imagesCallback(self,depth_image,color_image):
@@ -243,15 +264,16 @@ def main():
     listener = ImageListener(depth_topic,color_topic)
     listener.startMarkerDetection()
     listener.startObstacleDetection()
-    rate = rospy.Rate(10)
+    rate = rospy.Rate(15)
     try:
         while not rospy.is_shutdown():
             if listener.new_image:
                 listener.detectMarker()
                 listener.detectObstacle()
                 listener.publish_image()
+                listener.publish_marker()
             else:
-                rospy.loginfo("------")
+                rospy.logwarn("Waiting for synchronized depth image")
             rate.sleep()
             
 
