@@ -1,5 +1,6 @@
 <launch>
   <node name="local_odom" pkg="robot_nav" type="odom.py" required="True"/>
   <node name="goal_follower" pkg="robot_nav" type="odom_pub.py" output="screen"/>
+  <node name="marker_find" pkg="robot_nav" type="marker_search.py" output="screen"/>
 </launch>
 
