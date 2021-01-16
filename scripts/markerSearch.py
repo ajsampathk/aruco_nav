@@ -15,6 +15,7 @@ marker_search = False
 marker_aligned = False
 goal_set = False
 goal_published = False
+rot = False
 
 goal_stop = rospy.ServiceProxy('ria/odom/goal/stop', SetBool)
 goal_reset = rospy.ServiceProxy('ria/odom/goal/reset', Trigger)
@@ -49,42 +50,58 @@ def detectCallback(msg):
     if not marker_search:
         return
     increment = min_angle
-    marker_aligned = msg.alinged
-    if not marker_detected:
+    marker_aligned = msg.aligned
+    if not marker_detected and msg.id == 2:
+        rospy.loginfo("Marker Detected {}".format(msg))
         try:
             marker_detected = True
             goal_stop(True)
+            rospy.loginfo("Goal Stopped Marker Detected")
             goal_reset()
+            rospy.loginfo("Goal Reseted Marker Detected")
             odom_reset()
+            rospy.loginfo("Odom Reseted Marker Detected")
+            goal_stop(False)
         except rospy.ServiceException as e:
             print("Service call falied: %s"%e)
-    elif  marker_aligned and not goal_set:
+    elif marker_detected and marker_aligned and not goal_set:
+        rospy.loginfo("Marker Aligned {}".format(msg))
         try:
             marker_detected = True
             goal_stop(True)
+            rospy.loginfo("Goal Stopped Marker Aligned")
             goal_reset()
+            rospy.loginfo("Goal Reseted Marker Aligned")
             odom_reset()
+            rospy.loginfo("Odom Reseted Marker Aligned")
+            #goal_stop(False)
         except rospy.ServiceException as e:
             print("Service call falied: %s"%e)
 
-        goal[0] = ((90 -abs(msg.theta))*_pi)/180
-        if msg.theta <0:
+        goal[0] = ((90 - abs(msg.theta))*pi)/180.0
+        if msg.theta > 0:
             goal[0] = -1*goal[0]
-        goal[1] = msg.distance*sin(abs(msg.theta))
+        goal[1] = msg.distance*sin(abs(msg.theta)*pi/180.0)
         goal_set = True
+        rospy.loginfo("Goal Set: {}".format(goal))
 
 def posCallback(msg):
-    global marker_search, goal_set, increment, pub, goal_published
+    global rot, marker_search, goal_stop,goal_set, increment, pub, goal_published
     s_ang = msg
-    if not marker_search or goal_published:
+    if (not marker_search) or goal_published:
         return
     if not goal_set:
         s_ang.angular.z += increment
+        #goal_stop(False)
         pub.publish(s_ang)
     else:
         goal_published = True
         s_ang.angular.z = goal[0]
         s_ang.linear.x = goal[1]
+        goal_stop(False)
+        rospy.loginfo("Goal Started")
+        pub.publish(s_ang)
+        rospy.loginfo("Goal Published: {}".format(s_ang))
 
 def listner():
     rospy.init_node('marker_search', anonymous=True)
