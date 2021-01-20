@@ -1,5 +1,7 @@
 <launch>
+  <include file="$(find dynamixel_workbench_controllers)/launch/dynamixel_controllers.launch" />
   <node name="local_odom" pkg="robot_nav" type="odom.py" required="True"/>
-  <node name="goal_follower" pkg="robot_nav" type="odom_pub.py" output="screen"/>
+  <node name="goal_follower" pkg="robot_nav" type="odom_pub.py"/>
+  <node name="marker_search" pkg="robot_nav" type="markerSearch.py" output="screen"/>
 </launch>
 
