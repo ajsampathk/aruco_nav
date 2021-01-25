@@ -105,21 +105,21 @@ class ArucoPerception:
                     self.mask_image[row,col,0]=128
 
                     #left axis
-                    self.mask_image[:,0:left_limit,1]=150
+                    self.mask_image[self.mid[1],0:left_limit]=255
                     self.mask_image[:,left_limit]=255
 
                     #right axis
-                    self.mask_image[:,right_limit:,1]=150
+                    self.mask_image[self.mid[1],right_limit:]=255
                     self.mask_image[:,right_limit]=255
 
                     #info box
-                    self.mask_image[25:130,5]=255
-                    self.mask_image[25:130,150]=255
-                    self.mask_image[25,5:150]=255
-                    self.mask_image[130,5:150]=255
+                    #self.mask_image[25:130,5]=255
+                    #self.mask_image[25:130,150]=255
+                    #self.mask_image[25,5:150]=255
+                    #self.mask_image[130,5:150]=255
                     
-                    font=cv2.FONT_HERSHEY_TRIPLEX
-                    fontScale = 0.32
+                    font=cv2.FONT_HERSHEY_SIMPLEX
+                    fontScale = 0.4
                     thickness = 1
 
                     range_org = (10,45)
@@ -149,6 +149,10 @@ class ArucoPerception:
                     self.mask_image = cv2.putText(self.mask_image,range_str,range_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
                     self.mask_image = cv2.putText(self.mask_image,center_str,center_org,font,fontScale,color,thickness,cv2.LINE_AA)
                     self.mask_image = cv2.putText(self.mask_image,r_width_str,r_width_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
+                    self.mask_image = cv2.putText(self.mask_image,density_str,density_org,font,fontScale,yellow,thickness,cv2.LINE_AA)
+                    self.mask_image = cv2.putText(self.mask_image,"F.O.I",(self.mid[0],self.image_height-20),font,0.7,white,thickness,cv2.LINE_AA)
+                    self.mask_image = cv2.putText(self.mask_image,"ArUco Perception",(self.mid[0]-50,20),cv2.FONT_HERSHEY_TRIPLEX,0.5,white,thickness,cv2.LINE_AA)
+
 
 
                 if self.log_info:
@@ -193,7 +197,7 @@ class ArucoPerception:
                         _theta = math.degrees(_theta)
                         if self.log_info:
                             rospy.loginfo("B:{},H:{},Theta:{}deg".format(_b,_h,_theta))
-                        _distance = float(self.cv_depth_image[center_x,center_y])/1000.0  
+                        _distance = float(self.cv_depth_image[center_y,center_x])/1000.0  
                         self.marker_msg.id = ids[0][0]
                         self.marker_msg.distance = _distance
                         self.marker_msg.theta = _theta
@@ -206,8 +210,8 @@ class ArucoPerception:
                         rospy.logwarn("Index Out of Bounds: {}".format(e))
 
                     if self.VISUALIZE:
-                        font=cv2.FONT_HERSHEY_TRIPLEX
-                        fontScale = 0.32
+                        font=cv2.FONT_HERSHEY_SIMPLEX
+                        fontScale = 0.4
                         thickness = 1
                         yellow=(255,255,0)
                         aruco.drawDetectedMarkers(frame,corners)
@@ -238,7 +242,37 @@ class ArucoPerception:
             self.marker_pub.publish(self.marker_msg)
             if self.log_info:
                 rospy.loginfo(marker_msg)
+        if self.VISUALIZE and self.marker_msg.id==2:
+            font=cv2.FONT_HERSHEY_SIMPLEX
+            fontScale=0.4
+            thickness=1
+            yellow=(255,255,0)
 
+            markerID_str = "Marker ID:{}".format(self.marker_msg.id)
+            markerTheta_str = "Theta: {:.2f} ".format(self.marker_msg.theta)
+            markerDistance_str = "Distance: {:.2f}".format(self.marker_msg.distance)
+            markerAligned_str = "Aligned: {}".format(self.marker_msg.aligned)
+
+            markerID_org = (10,145)
+            markerTheta_org = (markerID_org[0]+10,markerID_org[1]+15)
+            markerDistance_org = (markerID_org[0]+10,markerID_org[1]+30)
+            markerAligned_org = (markerID_org[0]+10,markerID_org[1]+45)
+            markerDistance_color = (0,255,255)
+
+            if self.marker_msg.aligned:
+                markerAligned_color=(0,255,0)
+                markerDistance_color=(0,255,0)
+            else:
+                markerAligned_color=(255,0,0)
+                
+           
+            self.mask_image = cv2.putText(self.mask_image,markerID_str,markerID_org,font,fontScale,(0,255,255),thickness,cv2.LINE_AA)
+            self.mask_image = cv2.putText(self.mask_image,markerTheta_str,markerTheta_org,font,fontScale,(0,255,255),thickness,cv2.LINE_AA)
+            self.mask_image = cv2.putText(self.mask_image,markerDistance_str,markerDistance_org,font,fontScale,markerDistance_color,thickness,cv2.LINE_AA)
+            self.mask_image = cv2.putText(self.mask_image,markerAligned_str,markerAligned_org,font,fontScale,markerAligned_color,thickness,cv2.LINE_AA)
+     
+           
+          
 
     def imagesCallback(self,depth_image,color_image):
         try:

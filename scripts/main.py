@@ -8,7 +8,7 @@ from ArucoPerception import ArucoPerception
 def main():
     color_topic = '/camera/color/image_raw'
     depth_topic = '/camera/aligned_depth_to_color/image_raw'
-    listener = ArucoPerception(depth_topic,color_topic)
+    listener = ArucoPerception(depth_topic,color_topic,visualize=True)
     listener.startMarkerDetection()
     listener.startObstacleDetection()
     rate = rospy.Rate(10)
@@ -17,8 +17,8 @@ def main():
             if listener.new_image:
                 listener.detectMarker()
                 listener.detectObstacle()
-                listener.publish_image()
                 listener.publish_marker()
+                listener.publish_image()
             else:
                 rospy.logwarn("Waiting for synchronized depth image")
             rate.sleep()
