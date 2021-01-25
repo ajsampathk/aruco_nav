@@ -1,5 +1,5 @@
-# robot_nav
-Navigation with Dynamixels and D435i
+# ArUco nav
+Navigation with Dynamixels and D435i using ArUco markers
 
 
 ### Obstacle Detection Visualized:
