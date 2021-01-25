@@ -1,21 +1,19 @@
-#!/usr/bin/env python
+
 import rospy
 import message_filters
 from sensor_msgs.msg import Image as msg_Image
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import cv2.aruco as aruco 
-import numpy as np
-import sys
-import os
 from std_msgs.msg import Bool
-from robot_nav.msg import Marker
+from aruco_nav.msg import Marker
+import numpy as np
 import math
 
-
-class ImageListener:
+class ArucoPerception:
 	
-    def __init__(self, depth_topic,color_topic=None,robot_width=1200):
+    def __init__(self, depth_topic,color_topic,robot_width=1200,visualize=False):
+        
         self.depth_topic = depth_topic
         self.color_topic = color_topic
         self.robot_width = robot_width
@@ -30,14 +28,14 @@ class ImageListener:
         self.color_sub = message_filters.Subscriber(color_topic, msg_Image)
         self.sync = message_filters.TimeSynchronizer([self.depth_sub,self.color_sub],1)
         self.sync.registerCallback(self.imagesCallback)
-        self.VISUALIZE= False
+        self.VISUALIZE= visualize
         self.log_info = False
         self.image_pub = rospy.Publisher('/mask/image',msg_Image,queue_size=1)
         self.obstacle_pub = rospy.Publisher('/ria/odom/obstacle',Bool,queue_size=1)
         self.marker_pub = rospy.Publisher('/ria/odom/marker', Marker, queue_size=1)
         rospy.loginfo("Initialized Listener")
         rospy.loginfo("Visualization: {}".format(self.VISUALIZE))
-        rospy.loginfo("Info Logging: {}".format(self.log_info))
+        rospy.loginfo("Logging: {}".format(self.log_info))
         self.mask_image = None
         self.marker_msg = Marker()
         self.marker_found = False
@@ -79,7 +77,7 @@ class ImageListener:
                 points = np.vstack((row,col)).T
 
                 try:
-                    right_limit = int(340+(485*((self.robot_width/2.0)/center_distance)))
+                    right_limit = int(340+(485*((self.robot_width/2.0)/center_distance))) #485 is the depth constant in pixel space for the D435i
                     left_limit = int(340-(485*((self.robot_width/2.0)/center_distance)))
                     if right_limit>=640:
                         right_limit=639
@@ -257,32 +255,3 @@ class ImageListener:
         except CvBridgeError as e:
             print(e)
             return
-
-def main():
-    color_topic = '/camera/color/image_raw'
-    depth_topic = '/camera/aligned_depth_to_color/image_raw'
-    listener = ImageListener(depth_topic,color_topic)
-    listener.startMarkerDetection()
-    listener.startObstacleDetection()
-    rate = rospy.Rate(15)
-    try:
-        while not rospy.is_shutdown():
-            if listener.new_image:
-                listener.detectMarker()
-                listener.detectObstacle()
-                listener.publish_image()
-                listener.publish_marker()
-            else:
-                rospy.logwarn("Waiting for synchronized depth image")
-            rate.sleep()
-            
-
-    except KeyboardInterrupt:
-        listener.stopAll()
-        rospy.loginfo("Stopping Node")
-        print("Killing All Threads")
-        exit()
-if __name__ == '__main__':
-    node_name = os.path.basename(sys.argv[0]).split('.')[0]
-    rospy.init_node(node_name)
-    main()
